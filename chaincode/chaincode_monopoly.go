@@ -7,7 +7,7 @@ package main
 
 /* Imports  
 * 4 utility libraries for handling bytes, reading and writing JSON, 
-formatting, and string manipulation  
+formatting, and string manipulation  '
 * 2 specific Hyperledger Fabric specific libraries for Smart Contracts  
 */ 
 import (
@@ -25,22 +25,22 @@ type SmartContract struct {
 }
 
 type Propriedade struct {
-	Location string `json:"Location"`
-	InitialValue string `json:"InitialValue"`
-	Holder string `json:"Holder"`
+	Location string 'json:"Location"'
+	InitialValue string 'json:"InitialValue"'
+	Holder string 'json:"Holder"'
 }
 
 type Wallet struct {
-	Value string `json:"InitialValue"`
-	Holder string `json:"Holder"`
+	Value string 'json:"InitialValue"'
+	Holder string 'json:"Holder"'
 }
 
 
 type ReservaDeTransacao struct {
-	Value string `json:"InitialValue"`
-	Buyer string `json:"Buyer"`
-	Seller string `json:"Seller"`
-	Location string `json:"Location"`
+	Value string 'json:"InitialValue"'
+	Buyer string 'json:"Buyer"'
+	Seller string 'json:"Seller"'
+	Location string 'json:"Location"'
 	// Datetime
 	// expired ?
 }
