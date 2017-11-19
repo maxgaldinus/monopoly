@@ -37,6 +37,7 @@ type Property struct {
 type Wallet struct {
 	Value int `json:"Value"`
 	Holder string `json:"Holder"`
+	Status string `json:"Status"`
 }
 
 
@@ -49,6 +50,16 @@ func (s *SmartContract) Init(APIstub shim.ChaincodeStubInterface) sc.Response {
 	s.initGame(APIstub)
 	return shim.Success(nil)
 }
+
+
+/**
+ * The Query method
+ * LEGACY method
+ */
+func (s *SmartContract) Query(APIstub shim.ChaincodeStubInterface) sc.Response {
+	return shim.Error("Unknown supported call - Query()")
+}
+
 
 
 /**
@@ -79,6 +90,8 @@ func (s *SmartContract) Invoke(APIstub shim.ChaincodeStubInterface) sc.Response 
 		return s.transferProperty(APIstub, args)
 	} else if function == "pay" {
 		return s.pay(APIstub)
+	} else if function == "bankrupt" {
+		return s.bankrupt(APIstub)
 	}
 
 	return shim.Error("Invalid Smart Contract function name.")
@@ -168,19 +181,25 @@ func (s *SmartContract) queryWallet(APIstub shim.ChaincodeStubInterface) sc.Resp
  */
 func (s *SmartContract) queryAllWallets(APIstub shim.ChaincodeStubInterface) sc.Response {
 	var wallets []Wallet
+	var wallet Wallet
 
+	// from Player 1 to Player 6
 	i := 1
-	for (i <= 7) {
+	for (i <= 6) {
 		holder := fmt.Sprintf("Player %d", i)
 		walletAsBytes, _ := APIstub.GetState(holder)
-	
-		var wallet Wallet
 		json.Unmarshal(walletAsBytes, &wallet)
 		wallets = append(wallets, wallet)
 		
 		i = i + 1
 	}
 	
+	/** Add BANK wallet */
+	walletAsBytes, _ := APIstub.GetState("Bank")
+	json.Unmarshal(walletAsBytes, &wallet)
+	wallets = append(wallets, wallet)
+	
+	// return
 	walletsAsBytes, _ := json.Marshal(wallets)
 
 	return shim.Success(walletsAsBytes)
@@ -319,28 +338,28 @@ func (s *SmartContract) finishGame(APIstub shim.ChaincodeStubInterface) sc.Respo
  */
 func getInitialStateProperties() []Property {
 	return []Property{
-		Property{Name:"Ipanema", Value:220, Holder:"Banco" },
-		Property{Name:"Leblon", Value:220, Holder:"Banco" },
-		Property{Name:"Copacabana", Value:240, Holder:"Banco" },
-		Property{Name:"Avenida Brigadeiro Faria Lima", Value:200, Holder:"Banco" },
-		Property{Name:"Avenida Presidente Juscelino Kubistcheck", Value:180, Holder:"Banco" },
-		Property{Name:"Avenida Engenheiro Luis Carlos Berrini", Value:180, Holder:"Banco" },
-		Property{Name:"Avenida Atlântica", Value:160, Holder:"Banco" },
-		Property{Name:"Avenida Vieira Souto", Value:140, Holder:"Banco" },
-		Property{Name:"Niterói", Value:140, Holder:"Banco" },
-		Property{Name:"Avenida Paulista", Value:120, Holder:"Banco" },
-		Property{Name:"Rua 25 de Março", Value:100, Holder:"Banco" },
-		Property{Name:"Avenida São João", Value:100, Holder:"Banco" },
-		Property{Name:"Praça da Sé", Value:60, Holder:"Banco" },
-		Property{Name:"Avenida Sumaré", Value:60, Holder:"Banco" },
-		Property{Name:"Avenida Cidade Jardim", Value:260, Holder:"Banco" },
-		Property{Name:"Pacaembu", Value:260, Holder:"Banco" },
-		Property{Name:"Ibirapuera", Value:280, Holder:"Banco" },
-		Property{Name:"Barra da Tijuca", Value:300, Holder:"Banco" },
-		Property{Name:"Jardim Botânico", Value:300, Holder:"Banco" },
-		Property{Name:"Lagoa Rodrigo de Freitas", Value:320, Holder:"Banco" },
-		Property{Name:"Avenida Morumbi", Value:350, Holder:"Banco" },
-		Property{Name:"Rua Oscar Freire", Value:400, Holder:"Banco" },
+		Property{Name:"Ipanema", Value:220, Holder:"Bank" },
+		Property{Name:"Leblon", Value:220, Holder:"Bank" },
+		Property{Name:"Copacabana", Value:240, Holder:"Bank" },
+		Property{Name:"Avenida Brigadeiro Faria Lima", Value:200, Holder:"Bank" },
+		Property{Name:"Avenida Presidente Juscelino Kubistcheck", Value:180, Holder:"Bank" },
+		Property{Name:"Avenida Engenheiro Luis Carlos Berrini", Value:180, Holder:"Bank" },
+		Property{Name:"Avenida Atlântica", Value:160, Holder:"Bank" },
+		Property{Name:"Avenida Vieira Souto", Value:140, Holder:"Bank" },
+		Property{Name:"Niterói", Value:140, Holder:"Bank" },
+		Property{Name:"Avenida Paulista", Value:120, Holder:"Bank" },
+		Property{Name:"Rua 25 de Março", Value:100, Holder:"Bank" },
+		Property{Name:"Avenida São João", Value:100, Holder:"Bank" },
+		Property{Name:"Praça da Sé", Value:60, Holder:"Bank" },
+		Property{Name:"Avenida Sumaré", Value:60, Holder:"Bank" },
+		Property{Name:"Avenida Cidade Jardim", Value:260, Holder:"Bank" },
+		Property{Name:"Pacaembu", Value:260, Holder:"Bank" },
+		Property{Name:"Ibirapuera", Value:280, Holder:"Bank" },
+		Property{Name:"Barra da Tijuca", Value:300, Holder:"Bank" },
+		Property{Name:"Jardim Botânico", Value:300, Holder:"Bank" },
+		Property{Name:"Lagoa Rodrigo de Freitas", Value:320, Holder:"Bank" },
+		Property{Name:"Avenida Morumbi", Value:350, Holder:"Bank" },
+		Property{Name:"Rua Oscar Freire", Value:400, Holder:"Bank" },
 	}
 }
 
@@ -367,14 +386,15 @@ func (s *SmartContract) initProperties(APIstub shim.ChaincodeStubInterface) sc.R
 
 /**
  * The initWallets method
- *
+ * Start six wallets with names Player 1 to Player 6 with initial balance 1,500.
+ * Add an additional wallet named Bank with initial value 10,000.
  */
 func (s *SmartContract) initWallets(APIstub shim.ChaincodeStubInterface) sc.Response {
         i := 1
 	for (i <= 6) {
 		fmt.Println("i is ", i)
 		currentHolder := fmt.Sprintf("Player %d", i)
-		wallet := Wallet{Holder: currentHolder, Value: 1500}
+		wallet := Wallet{Holder: currentHolder, Value: 1500, Status: "Active"}
 
 		walletAsBytes, _ := json.Marshal(wallet)
 		APIstub.PutState(wallet.Holder, walletAsBytes)
@@ -382,9 +402,9 @@ func (s *SmartContract) initWallets(APIstub shim.ChaincodeStubInterface) sc.Resp
 		i = i + 1
 	}
 	
-	bankWallet := Wallet{Holder: "Banco", Value: 10000}
+	bankWallet := Wallet{Holder: "Bank", Value: 100000, Status: "Active"}
 	bankWalletAsBytes, _ := json.Marshal(bankWallet)
-	APIstub.PutState("Banco", bankWalletAsBytes)
+	APIstub.PutState("Bank", bankWalletAsBytes)
 	
 	return shim.Success(nil)
 }
@@ -393,6 +413,10 @@ func (s *SmartContract) initWallets(APIstub shim.ChaincodeStubInterface) sc.Resp
 /**
  * The transferProperty method
  * transferProperty( property, currentHolder, newHolder, price)
+ * property is the Property Name, e.g. Ipanema
+ * currentHolder is the seller, e.g. Player 1
+ * newHolder is the buyer, e.g. Player 2
+ * price is the price, e.g. 200
  */
 func (s *SmartContract) transferProperty(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
 	if len(args) != 4 {
@@ -435,7 +459,10 @@ func (s *SmartContract) transferProperty(APIstub shim.ChaincodeStubInterface, ar
 
 /**
  * The pay Method
- *
+ * pay(from, to, value)
+ * from is the source wallet
+ * to is the target wallet
+ * 
  */
 func (s *SmartContract) pay(APIstub shim.ChaincodeStubInterface) sc.Response {
 	_, args := APIstub.GetFunctionAndParameters()
@@ -458,11 +485,24 @@ func (s *SmartContract) pay(APIstub shim.ChaincodeStubInterface) sc.Response {
 /**
  * The doPayment method
  * INTERNAL to this smart contract only.
- *
+ * Usage: doPayment(from, to, value)
+ * from is the source wallet
+ * to is the target wallet
+ * value is the exchange value
+ * Returns an empty string if the operation is OK.
+ * Returns a error message case if:
+ * - invalid source
+ * - invalid target
+ * - insufficient funds from source
+ * This method updates BOTH from and to wallets
  */
 func doPayment(APIstub shim.ChaincodeStubInterface, from string, to string, value int) (string) {
+	// from = to?
+	if from == to {
+		return fmt.Sprintf("Source wallet and target wallet are equal, %s?", from)
+	}
 		
-	// pegar carteira ORIGEM
+	// get SOURCE wallet
 	walletFromAsBytes, _ := APIstub.GetState(from)
 	if walletFromAsBytes == nil {
 		return fmt.Sprintf("Could not locate source wallet for %s", from)
@@ -470,7 +510,12 @@ func doPayment(APIstub shim.ChaincodeStubInterface, from string, to string, valu
 	walletFrom := Wallet{}
 	json.Unmarshal(walletFromAsBytes, &walletFrom)
 	
-	// pegar carteira DESTINO
+	// SOURCE is Active?
+	if walletFrom.Status != "Active" {
+		return fmt.Sprintf("Wallet for %s is not active anymore.", from)
+	}
+	
+	// get TARGET wallet
 	walletToAsBytes, _ := APIstub.GetState(to)
 	if walletToAsBytes == nil {
 		return fmt.Sprintf("Could not locate target wallet for %s", to)
@@ -478,12 +523,17 @@ func doPayment(APIstub shim.ChaincodeStubInterface, from string, to string, valu
 	walletTo := Wallet{}
 	json.Unmarshal(walletToAsBytes, &walletTo)
 	
-	// transfere recursos
+	// TARGET is Active?
+	if walletTo.Status != "Active" {
+		return fmt.Sprintf("Wallet for %s is not active anymore.", to)
+	}
+	
+	// transfer resources
 	if walletTo.Value < value {
 		return fmt.Sprintf("Insufficient funds to transfer %d from %s to %s", value, from, to)
 	}
 
-	// salva estado
+	// save both wallets
 	x := Wallet{Holder: walletFrom.Holder, Value:  walletFrom.Value - value}
 	xx, _ := json.Marshal(x)
 	err := APIstub.PutState(walletFrom.Holder, xx)
@@ -500,6 +550,46 @@ func doPayment(APIstub shim.ChaincodeStubInterface, from string, to string, valu
 	return ""
 }
 
+/**
+ * The bankrupt method.
+ * bankrupt(who)
+ * Any remaining funds will go to the Bank.
+ */
+func (s *SmartContract) bankrupt(APIstub shim.ChaincodeStubInterface) sc.Response {
+	_, args := APIstub.GetFunctionAndParameters()
+
+	if len(args) != 1 {
+		return shim.Error("Incorrect number of arguments for pay. Expecting 1 - (who)")
+	}
+	who := args[0]
+	
+	if who == "Bank" {
+		return shim.Error("Bankrupt BANK is not allowed.")
+	}
+
+	walletAsBytes, _ := APIstub.GetState(who)
+	if walletAsBytes == nil {
+		return shim.Error(fmt.Sprintf("Could not locate wallet for %s", who))
+	}
+	var wallet Wallet
+	json.Unmarshal(walletAsBytes, &wallet)
+
+	if wallet.Value > 0 {
+		errorMsg := doPayment(APIstub, who, "Bank", wallet.Value)
+		if errorMsg != "" {
+			return shim.Error(errorMsg)
+		}
+	}
+	
+	wallet.Status = "Inactive"
+	w, _ := json.Marshal(wallet)
+	err := APIstub.PutState(who, w)
+	if err != nil {
+		return shim.Error(fmt.Sprintf("Failed to bankrupt %s", who))
+	}
+
+	return shim.Success(nil);
+}
 
 /*
  * main function
