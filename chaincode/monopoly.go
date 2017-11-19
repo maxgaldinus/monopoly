@@ -1,537 +1,518 @@
 /**
-
  * BLOCKCHAIN EXPERIENCE
-
- * Banco Imobiliário
-
+ * Based on Monopoly Game Rules.
+ * 
  */
-
-
 
 package main
 
-
-
-/* Imports  
-
-* 4 utility libraries for handling bytes, reading and writing JSON, formatting, and string manipulation
-
-* 2 specific Hyperledger Fabric specific libraries for Smart Contracts  
-
-*/ 
-
 import (
-
-	"bytes"
-
+//	"bytes"
 	"encoding/json"
-
 	"fmt"
-
-//	"strconv"
-
-
-
+	"strconv"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
-
 	sc "github.com/hyperledger/fabric/protos/peer"
-
 )
 
-
-
 // Define the Smart Contract structure
-
 type SmartContract struct {
-
 }
 
-
-
-type Propriedade struct {
-
-	Location string `json:"Location"`
-
-	InitialValue string `json:"InitialValue"`
-
+/**
+ * Property corresponds to a property title.
+ * The Monopoly's property title has a lot of attributes such as: name, building block, terrain price, rent price, building price and others.
+ * At this version of Blockchain Experience only name, value and current holder are used.
+ */
+type Property struct {
+	Name string `json:"Name"`
+	Value int `json:"Value"`
 	Holder string `json:"Holder"`
-
 }
 
-
-
+/**
+ * Wallet contains the current cash balance of the Holder/Owner.
+ * In the future it can contains the Properties and other assets stored as Tokens.
+ */
 type Wallet struct {
-
-	Value string `json:"InitialValue"`
-
+	Value int `json:"Value"`
 	Holder string `json:"Holder"`
-
 }
 
 
-
-
-
-type ReservaDeTransacao struct {
-
-	Value string `json:"InitialValue"`
-
-	Buyer string `json:"Buyer"`
-
-	Seller string `json:"Seller"`
-
-	Location string `json:"Location"`
-
-	// Datetime
-
-	// expired ?
-
-}
-
-
-
-
-
-
-
-/*
-
+/**
  * The Init method
-
  * called when the Smart Contract is instantiated by the network
-
- * Best practice is to have any Ledger initialization in separate function -- see initLedger()
-
+ * When deployed in Blockchain it initializes all properties and wallets.
  */
-
-func (s *SmartContract) Init(stub shim.ChaincodeStubInterface) sc.Response {
-
-          return shim.Success(nil)
-
+func (s *SmartContract) Init(APIstub shim.ChaincodeStubInterface) sc.Response {
+	s.initGame(APIstub)
+	return shim.Success(nil)
 }
 
 
-
-
-
-/*
-
+/**
  * The Invoke method
-
  * called when an application requests to run the Smart Contract 
-
  * The app also specifies the specific smart contract function to call with args
-
  */
-
-//func (s *SmartContract) Invoke(stub shim.ChaincodeStubInterface) sc.Response {
-
-
-
-//func (t *SmartContract) Invoke(stub shim.ChaincodeStubInterface) sc.Response {
-
-
-
-func (s *SmartContract) Invoke(stub shim.ChaincodeStubInterface) sc.Response {
-
-    // Retrieve the requested Smart Contract function and arguments
-
-	function, args := stub.GetFunctionAndParameters()
-
-	function = function
-
-	args = args
+func (s *SmartContract) Invoke(APIstub shim.ChaincodeStubInterface) sc.Response {
+	// Retrieve the requested Smart Contract function and arguments
+	function, args := APIstub.GetFunctionAndParameters()
 
 	// Route to the appropriate handler function to interact with the ledger appropriately
-
-
-
 	if function == "queryAllProperties" {
-
-		return s.queryAllProperties(stub)
-
+		return s.queryAllProperties(APIstub)
 	} else if function == "queryProperty" {
-
-		return s.queryProperty(stub, args)
-
-	} else if function == "initLedger" {
-
-		return s.initLedger(stub)
-
-	} else if function == "transferirPropriedade" {
-
-		return s.transferirPropriedade(stub, args)
-
-	//} else if function == "realizarPagamento" {
-
-	//	return s.realizarPagamento(stub, args)
-
+		return s.queryProperty(APIstub, args)
+	} else if function == "queryWallet" {
+		return s.queryWallet(APIstub)
+	} else if function == "queryAllWallets" {
+		return s.queryAllWallets(APIstub)
+	} else if function == "queryPropertyHistory" {
+		return s.queryPropertyHistory(APIstub)
+	} else if function == "queryWalletHistory" {
+		return s.queryWalletHistory(APIstub)
+	} else if function == "initGame" {
+		return s.initGame(APIstub)
+	} else if function == "transferProperty" {
+		return s.transferProperty(APIstub, args)
+	} else if function == "pay" {
+		return s.pay(APIstub)
 	}
-
-
-
-	//else if function == "consultarTodasPropriedades" {
-
-	//	return s.consultarTodasPropriedades(stub)
-
-	//}
 
 	return shim.Error("Invalid Smart Contract function name.")
-
 }
 
 
+/**
+ * The queryAllProperties method
+ *
+ */
+func (s *SmartContract) queryAllProperties(APIstub shim.ChaincodeStubInterface) sc.Response {
+	var properties []Property
 
+	initialPropertiesList := getInitialStateProperties()
 
+	i := 0
+	for i < len(initialPropertiesList) {
+		
+		propertyAsBytes, _ := APIstub.GetState(initialPropertiesList[i].Name)
 
-
-
-func (s *SmartContract) queryAllProperties(stub shim.ChaincodeStubInterface) sc.Response {
-
-
-
-	startKey := "0"
-
-	endKey := "999"
-
-
-
-	resultsIterator, err := stub.GetStateByRange(startKey, endKey)
-
-	if err != nil {
-
-		return shim.Error(err.Error())
-
+		var property Property
+		json.Unmarshal(propertyAsBytes, &property)
+		properties = append(properties, property)
+		
+		i = i + 1
 	}
+	
+	propertiesAsBytes, _ := json.Marshal(properties)
 
-	defer resultsIterator.Close()
-
-
-
-	// buffer is a JSON array containing QueryResults
-
-	var buffer bytes.Buffer
-
-	buffer.WriteString("[")
-
-
-
-	bArrayMemberAlreadyWritten := false
-
-	for resultsIterator.HasNext() {
-
-		queryResponse, err := resultsIterator.Next()
-
-		if err != nil {
-
-			return shim.Error(err.Error())
-
-		}
-
-		// Add comma before array members,suppress it for the first array member
-
-		if bArrayMemberAlreadyWritten == true {
-
-			buffer.WriteString(",")
-
-		}
-
-		buffer.WriteString("{\"Key\":")
-
-		buffer.WriteString("\"")
-
-		buffer.WriteString(queryResponse.Key)
-
-		buffer.WriteString("\"")
-
-
-
-		buffer.WriteString(", \"Record\":")
-
-		// Record is a JSON object, so we write as-is
-
-		buffer.WriteString(string(queryResponse.Value))
-
-		buffer.WriteString("}")
-
-		bArrayMemberAlreadyWritten = true
-
-	}
-
-	buffer.WriteString("]")
-
-
-
-	fmt.Printf("- queryAllProperties:\n%s\n", buffer.String())
-
-
-
-	return shim.Success(buffer.Bytes())
-
+	return shim.Success(propertiesAsBytes)
 }
 
 
-
-
-
-
-
-func (s *SmartContract) queryProperty(stub shim.ChaincodeStubInterface, args []string) sc.Response {
+/**
+ * The queryProperty method
+ *
+ */
+func (s *SmartContract) queryProperty(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	var arg, jsonResp string
+	var err error
 
 	if len(args) != 1 {
-
 		return shim.Error("Incorrect number of arguments. Expecting 1")
-
 	}
-
-	propriedadeAsBytes, _ := stub.GetState(args[0])
-
-	if propriedadeAsBytes == nil {
-
-		return shim.Error("Could not locate property")
-
-	}
-
-	return shim.Success(propriedadeAsBytes)
-
-}
-
-
-
-
-
-func (s *SmartContract) initLedger(stub shim.ChaincodeStubInterface) sc.Response {
-
-	propriedades := []Propriedade{
-
-		Propriedade{Location: "Jardim Botânico", InitialValue: "100000", Holder: "Banco"},
-
-		Propriedade{Location: "Avenida Niemeyer", InitialValue: "75000", Holder: "Banco"},
-
-	}
-
-	i := 0
-
-	for i < len(propriedades) {
-
-		fmt.Println("i is ", i)
-
-		propriedadeAsBytes, _ := json.Marshal(propriedades[i])
-
-		stub.PutState(propriedades[i].Location, propriedadeAsBytes)
-
-		fmt.Println("Added", propriedades[i])
-
-		i = i + 1
-
-	}
-
-	return shim.Success(nil)
-
-}
-
-
-
-func (s *SmartContract) initWallets(stub shim.ChaincodeStubInterface) sc.Response {
-
-	wallets := []Wallet{
-
-		Wallet{Value: "100000", Holder: "Player 1"},
-
-		Wallet{Value: "75000", Holder: "Player 2"},
-
-		Wallet{Value: "999999999999", Holder: "Banco"},
-
-	}
-
-	i := 0
-
-	for i < len(wallets) {
-
-		fmt.Println("i is ", i)
-
-		walletAsBytes, _ := json.Marshal(wallets[i])
-
-		stub.PutState(wallets[i].Holder, walletAsBytes)
-
-		fmt.Println("Added", wallets[i])
-
-		i = i + 1
-
-	}
-
-	return shim.Success(nil)
-
-}
-
-
-
-func (s *SmartContract) transferirPropriedade(stub shim.ChaincodeStubInterface, args []string) sc.Response {
-
-	if len(args) != 2 {
-
-		return shim.Error("Incorrect number of arguments. Expecting 2")
-
-	}
-
-	propriedadeAsBytes, _ := stub.GetState(args[0])
-
-	if propriedadeAsBytes != nil {
-
-		return shim.Error("Could not locate property")
-
-	}
-
-	propriedade := Propriedade{}
-
-	json.Unmarshal(propriedadeAsBytes, &propriedade)
-
-
-
-	propriedade.Holder = args[1]
-
-	propriedadeAsBytes, _ = json.Marshal(propriedade)
-
-	err := stub.PutState(args[0], propriedadeAsBytes)
-
+	
+	arg = args[0]
+	propertyAsBytes, err := APIstub.GetState(arg)
 	if err != nil {
+		jsonResp = "{\"Error\":\"Failed to get state for " + arg + "\"}"
+		return shim.Error(jsonResp)
+	} else if propertyAsBytes == nil {
+		jsonResp = "{\"Error\":\"Property does not exist: " + arg + "\"}"
+		return shim.Error(jsonResp)
+	}
+	return shim.Success(propertyAsBytes)
+}
 
-		return shim.Error(fmt.Sprintf("Failed to change property holder: %s", args[0]))
 
+/**
+ * The queryWallet method
+ *
+ */
+func (s *SmartContract) queryWallet(APIstub shim.ChaincodeStubInterface) sc.Response {
+	var wallet string
+	var err error
+	
+	_, args := APIstub.GetFunctionAndParameters()
+	
+	if len(args) != 1 {
+		return shim.Error("Incorrect number of arguments. Expecting 1.")
+	}
+	
+	wallet = args[0]
+	walletAsBytes, err := APIstub.GetState(wallet)
+	if err != nil {
+		return shim.Error(fmt.Sprintf("Failed to get wallet for %s", wallet))
+	} else if walletAsBytes == nil {
+		return shim.Error(fmt.Sprintf("Wallet does not exist: %s", wallet))
+	}
+	return shim.Success(walletAsBytes)
+}
+
+
+/**
+ * The queryAllWallets method
+ *
+ */
+func (s *SmartContract) queryAllWallets(APIstub shim.ChaincodeStubInterface) sc.Response {
+	var wallets []Wallet
+
+	i := 1
+	for (i <= 7) {
+		holder := fmt.Sprintf("Player %d", i)
+		walletAsBytes, _ := APIstub.GetState(holder)
+	
+		var wallet Wallet
+		json.Unmarshal(walletAsBytes, &wallet)
+		wallets = append(wallets, wallet)
+		
+		i = i + 1
+	}
+	
+	walletsAsBytes, _ := json.Marshal(wallets)
+
+	return shim.Success(walletsAsBytes)
+}
+
+
+/**
+ * The queryPropertyHistory method.
+ *
+ */
+func (s *SmartContract) queryPropertyHistory(APIstub shim.ChaincodeStubInterface) sc.Response {
+	type PropertyHistory struct {
+		TxId    string   `json:"txId"`
+		Value   Property  `json:"value"`
 	}
 
-	return shim.Success(nil)
+	var history []PropertyHistory;
+	var property Property
 
+	_, args := APIstub.GetFunctionAndParameters()
+	if len(args) != 1 {
+		return shim.Error("Incorrect number of arguments. Expecting 1.")
+	}
+	
+	propertyName := args[0]
+	fmt.Printf("- start getHistoryForProperty: %s\n", propertyName)
+	
+	// Get History
+	resultsIterator, err := APIstub.GetHistoryForKey(propertyName)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer resultsIterator.Close()
+
+	for resultsIterator.HasNext() {
+		historyData, err := resultsIterator.Next()
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+
+		var tx PropertyHistory
+		tx.TxId = historyData.TxId                     //copy transaction id over
+		json.Unmarshal(historyData.Value, &property)     //un stringify it aka JSON.parse()
+		if historyData.Value == nil {                  //marble has been deleted
+			var emptyProperty Property
+			tx.Value = emptyProperty 		//copy nil marble
+		} else {
+			json.Unmarshal(historyData.Value, &property) //un stringify it aka JSON.parse()
+			tx.Value = property                      //copy marble over
+		}
+		history = append(history, tx)              //add this tx to the list
+	}
+
+	historyAsBytes, _ := json.Marshal(history)     //convert to array of bytes
+
+	return shim.Success(historyAsBytes)
+}
+
+/**
+ * The queryWalletHistory method
+ *
+ */
+func (s *SmartContract) queryWalletHistory(APIstub shim.ChaincodeStubInterface) sc.Response {
+	type WalletHistory struct {
+		TxId    string   `json:"txId"`
+		Value   Wallet  `json:"value"`
+	}
+
+	var history []WalletHistory;
+	var wallet Wallet
+
+	_, args := APIstub.GetFunctionAndParameters()
+	if len(args) != 1 {
+		return shim.Error("Incorrect number of arguments. Expecting 1.")
+	}
+	
+	walletName := args[0]
+		
+	// Get History
+	resultsIterator, err := APIstub.GetHistoryForKey(walletName)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer resultsIterator.Close()
+
+	for resultsIterator.HasNext() {
+		historyData, err := resultsIterator.Next()
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+
+		var tx WalletHistory
+		tx.TxId = historyData.TxId                     //copy transaction id over
+		json.Unmarshal(historyData.Value, &wallet)     //un stringify it aka JSON.parse()
+		if historyData.Value == nil {                  //marble has been deleted
+			var emptyWallet Wallet
+			tx.Value = emptyWallet 		//copy nil marble
+		} else {
+			json.Unmarshal(historyData.Value, &wallet) //un stringify it aka JSON.parse()
+			tx.Value = wallet                      //copy marble over
+		}
+		history = append(history, tx)              //add this tx to the list
+	}
+
+	historyAsBytes, _ := json.Marshal(history)     //convert to array of bytes
+
+	return shim.Success(historyAsBytes)
 }
 
 
 
 
+/**
+ * The initGame method
+ * 
+ */
+func (s *SmartContract) initGame(APIstub shim.ChaincodeStubInterface) sc.Response {
+	s.initProperties(APIstub)
+	s.initWallets(APIstub)
+	return shim.Success(nil)
+}
 
-func (s *SmartContract) realizarPagamento(stub shim.ChaincodeStubInterface, args []string) sc.Response {
+
+/**
+ * The finishGame method
+ * This method was not implement yet.
+ */
+func (s *SmartContract) finishGame(APIstub shim.ChaincodeStubInterface) sc.Response {
+	return shim.Success(nil)
+}
+
+
+/**
+ * The getInitialStateProperties function
+ *
+ */
+func getInitialStateProperties() []Property {
+	return []Property{
+		Property{Name:"Ipanema", Value:220, Holder:"Banco" },
+		Property{Name:"Leblon", Value:220, Holder:"Banco" },
+		Property{Name:"Copacabana", Value:240, Holder:"Banco" },
+		Property{Name:"Avenida Brigadeiro Faria Lima", Value:200, Holder:"Banco" },
+		Property{Name:"Avenida Presidente Juscelino Kubistcheck", Value:180, Holder:"Banco" },
+		Property{Name:"Avenida Engenheiro Luis Carlos Berrini", Value:180, Holder:"Banco" },
+		Property{Name:"Avenida Atlântica", Value:160, Holder:"Banco" },
+		Property{Name:"Avenida Vieira Souto", Value:140, Holder:"Banco" },
+		Property{Name:"Niterói", Value:140, Holder:"Banco" },
+		Property{Name:"Avenida Paulista", Value:120, Holder:"Banco" },
+		Property{Name:"Rua 25 de Março", Value:100, Holder:"Banco" },
+		Property{Name:"Avenida São João", Value:100, Holder:"Banco" },
+		Property{Name:"Praça da Sé", Value:60, Holder:"Banco" },
+		Property{Name:"Avenida Sumaré", Value:60, Holder:"Banco" },
+		Property{Name:"Avenida Cidade Jardim", Value:260, Holder:"Banco" },
+		Property{Name:"Pacaembu", Value:260, Holder:"Banco" },
+		Property{Name:"Ibirapuera", Value:280, Holder:"Banco" },
+		Property{Name:"Barra da Tijuca", Value:300, Holder:"Banco" },
+		Property{Name:"Jardim Botânico", Value:300, Holder:"Banco" },
+		Property{Name:"Lagoa Rodrigo de Freitas", Value:320, Holder:"Banco" },
+		Property{Name:"Avenida Morumbi", Value:350, Holder:"Banco" },
+		Property{Name:"Rua Oscar Freire", Value:400, Holder:"Banco" },
+	}
+}
+
+
+/**
+ * The initProperties method
+ *
+ */
+func (s *SmartContract) initProperties(APIstub shim.ChaincodeStubInterface) sc.Response {
+	properties := getInitialStateProperties()
+	i := 0
+	for i < len(properties) {
+		fmt.Println("i is ", i)
+		propertyAsBytes, _ := json.Marshal(properties[i])
+		nameAsBytes, _ := json.Marshal(properties[i].Name)
+		APIstub.PutState(fmt.Sprintf("Property %i", i), nameAsBytes)
+		APIstub.PutState(properties[i].Name, propertyAsBytes)
+		fmt.Println("Added", properties[i])
+		i = i + 1
+	}
+	return shim.Success(nil)
+}
+
+
+/**
+ * The initWallets method
+ *
+ */
+func (s *SmartContract) initWallets(APIstub shim.ChaincodeStubInterface) sc.Response {
+        i := 1
+	for (i <= 6) {
+		fmt.Println("i is ", i)
+		currentHolder := fmt.Sprintf("Player %d", i)
+		wallet := Wallet{Holder: currentHolder, Value: 1500}
+
+		walletAsBytes, _ := json.Marshal(wallet)
+		APIstub.PutState(wallet.Holder, walletAsBytes)
+		fmt.Println("Added", wallet)
+		i = i + 1
+	}
+	
+	bankWallet := Wallet{Holder: "Banco", Value: 10000}
+	bankWalletAsBytes, _ := json.Marshal(bankWallet)
+	APIstub.PutState("Banco", bankWalletAsBytes)
+	
+	return shim.Success(nil)
+}
+
+
+/**
+ * The transferProperty method
+ * transferProperty( property, currentHolder, newHolder, price)
+ */
+func (s *SmartContract) transferProperty(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	if len(args) != 4 {
+		return shim.Error("Incorrect number of arguments. Expecting 2")
+	}
+	
+	argProperty := args[0]
+	argCurrentHolder := args[1]
+	argNewHolder := args[2]
+	argPrice := args[3]
+		
+	propertyAsBytes, _ := APIstub.GetState(argProperty)
+	if propertyAsBytes == nil {
+		return shim.Error(fmt.Sprintf("Could not locate property %s.", argProperty))
+	}
+	property := Property{}
+	json.Unmarshal(propertyAsBytes, &property)
+
+	if property.Holder != argCurrentHolder {
+		return shim.Error(fmt.Sprintf("Holder %s is invalid for property %s.", argCurrentHolder, argProperty))
+	}
+
+	priceValue, err := strconv.Atoi(argPrice)
+	
+	errorMsg := doPayment(APIstub, argNewHolder, argCurrentHolder, priceValue)
+	
+	if errorMsg != "" {
+		return shim.Error(errorMsg)
+	}
+
+	property.Holder = argNewHolder
+	propertyAsBytes, _ = json.Marshal(property)
+	err = APIstub.PutState(args[0], propertyAsBytes)
+	if err != nil {
+		return shim.Error(fmt.Sprintf("Failed to change property holder: %s", args[0]))
+	}
+	return shim.Success(nil)
+}
+
+
+/**
+ * The pay Method
+ *
+ */
+func (s *SmartContract) pay(APIstub shim.ChaincodeStubInterface) sc.Response {
+	_, args := APIstub.GetFunctionAndParameters()
 
 	if len(args) != 3 {
-
-		return shim.Error("Incorrect number of arguments. Expecting 3")
-
+		return shim.Error("Incorrect number of arguments for pay. Expecting 3 - (from, to, value)")
 	}
-
-	
-
-	// pegar carteira ORIGEM
-
-	walletFromAsBytes, _ := stub.GetState(args[0])
-
-	if walletFromAsBytes != nil {
-
-		return shim.Error("Could not locate source wallet")
-
-	}
-
-	walletFrom := Wallet{}
-
-	json.Unmarshal(walletFromAsBytes, &walletFrom)
-
-	
-
-	// pegar carteira DESTINO
-
-	walletToAsBytes, _ := stub.GetState(args[1])
-
-	if walletToAsBytes != nil {
-
-		return shim.Error("Could not locate target wallet")
-
-	}
-
-	walletTo := Wallet{}
-
-	json.Unmarshal(walletToAsBytes, &walletTo)
-
-	
-
-	// transfere recursos
-
-	Value := args[2]
-
-	
-
-	if walletTo.Value < Value {
-
-		return shim.Error(fmt.Sprintf("Insufficient funds to transfer %s from %s to %s", args[2], args[0], args[1]))
-
-	}
-
-	
-
-	/**
-
-	walletFrom.Value := walletFrom.Value - Value
-
-	walletTo.Value := walletTo.Value + Value
-
-
-
-	// salva estado
-
-	walletFromAsBytes, _ := json.Marshal(walletFrom)
-
-	walletToAsBytes, _ := json.Marshal(walletTo)
-
-	err := stub.PutState(walletFrom.Holder, walletFromAsBytes)
-
+	value, err := strconv.Atoi(args[2])
 	if err != nil {
-
-		return shim.Error(fmt.Sprintf("Failed to transfer value from %s to %s", args[0], args[1]))
-
+		return shim.Error("Invalid value for payment.")
 	}
-
-	err := stub.PutState(walletTo.Holder, walletToAsBytes)
-
-	if err != nil {
-
-		return shim.Error(fmt.Sprintf("Failed to transfer value from %s to %s", args[0], args[1]))
-
+	errorMsg := doPayment(APIstub, args[0], args[1], value)
+	if errorMsg != "" {
+		return shim.Error(errorMsg)
 	}
-
-	**/
-
-	return shim.Success(nil)
-
+	return shim.Success(nil);
 }
 
 
+/**
+ * The doPayment method
+ * INTERNAL to this smart contract only.
+ *
+ */
+func doPayment(APIstub shim.ChaincodeStubInterface, from string, to string, value int) (string) {
+		
+	// pegar carteira ORIGEM
+	walletFromAsBytes, _ := APIstub.GetState(from)
+	if walletFromAsBytes == nil {
+		return fmt.Sprintf("Could not locate source wallet for %s", from)
+	}
+	walletFrom := Wallet{}
+	json.Unmarshal(walletFromAsBytes, &walletFrom)
+	
+	// pegar carteira DESTINO
+	walletToAsBytes, _ := APIstub.GetState(to)
+	if walletToAsBytes == nil {
+		return fmt.Sprintf("Could not locate target wallet for %s", to)
+	}
+	walletTo := Wallet{}
+	json.Unmarshal(walletToAsBytes, &walletTo)
+	
+	// transfere recursos
+	if walletTo.Value < value {
+		return fmt.Sprintf("Insufficient funds to transfer %d from %s to %s", value, from, to)
+	}
 
+	// salva estado
+	x := Wallet{Holder: walletFrom.Holder, Value:  walletFrom.Value - value}
+	xx, _ := json.Marshal(x)
+	err := APIstub.PutState(walletFrom.Holder, xx)
+	if err != nil {
+		return fmt.Sprintf("Failed to transfer value FROM %s to %s", from, to)
+	}
+	
+
+	y, _ := json.Marshal(Wallet{Holder: walletTo.Holder, Value:  walletTo.Value + value})
+	err = APIstub.PutState(walletTo.Holder, y)
+	if err != nil {
+		return fmt.Sprintf("Failed to transfer value from %s TO %s", from, to)
+	}
+	return ""
+}
 
 
 /*
-
  * main function
-
  * calls the Start function 
-
  * The main function starts the chaincode in the container during instantiation.
-
  */
-
 func main() {
 
-
-
 	// Create a new Smart Contract
-
 	err := shim.Start(new(SmartContract))
-
 	if err != nil {
-
 		fmt.Printf("Error creating new Smart Contract: %s", err)
-
 	} else {
-
                 fmt.Printf("Success creating new Smart Contract")
-
         }
-
-//	shim.Invoke()
-
 }
