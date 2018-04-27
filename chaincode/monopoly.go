@@ -344,19 +344,19 @@ func getInitialStateProperties() []Property {
 		Property{Name:"Avenida Brigadeiro Faria Lima", Value:200, Holder:"Bank" },
 		Property{Name:"Avenida Presidente Juscelino Kubistcheck", Value:180, Holder:"Bank" },
 		Property{Name:"Avenida Engenheiro Luis Carlos Berrini", Value:180, Holder:"Bank" },
-		Property{Name:"Avenida Atlântica", Value:160, Holder:"Bank" },
+		Property{Name:"Avenida Atlantica", Value:160, Holder:"Bank" },
 		Property{Name:"Avenida Vieira Souto", Value:140, Holder:"Bank" },
-		Property{Name:"Niterói", Value:140, Holder:"Bank" },
+		Property{Name:"Niteroi", Value:140, Holder:"Bank" },
 		Property{Name:"Avenida Paulista", Value:120, Holder:"Bank" },
-		Property{Name:"Rua 25 de Março", Value:100, Holder:"Bank" },
-		Property{Name:"Avenida São João", Value:100, Holder:"Bank" },
-		Property{Name:"Praça da Sé", Value:60, Holder:"Bank" },
-		Property{Name:"Avenida Sumaré", Value:60, Holder:"Bank" },
+		Property{Name:"Rua 25 de Marco", Value:100, Holder:"Bank" },
+		Property{Name:"Avenida Sao Joao", Value:100, Holder:"Bank" },
+		Property{Name:"Praca da Se", Value:60, Holder:"Bank" },
+		Property{Name:"Avenida Sumare", Value:60, Holder:"Bank" },
 		Property{Name:"Avenida Cidade Jardim", Value:260, Holder:"Bank" },
 		Property{Name:"Pacaembu", Value:260, Holder:"Bank" },
 		Property{Name:"Ibirapuera", Value:280, Holder:"Bank" },
 		Property{Name:"Barra da Tijuca", Value:300, Holder:"Bank" },
-		Property{Name:"Jardim Botânico", Value:300, Holder:"Bank" },
+		Property{Name:"Jardim Botanico", Value:300, Holder:"Bank" },
 		Property{Name:"Lagoa Rodrigo de Freitas", Value:320, Holder:"Bank" },
 		Property{Name:"Avenida Morumbi", Value:350, Holder:"Bank" },
 		Property{Name:"Rua Oscar Freire", Value:400, Holder:"Bank" },
@@ -534,7 +534,7 @@ func doPayment(APIstub shim.ChaincodeStubInterface, from string, to string, valu
 	}
 
 	// save both wallets
-	x := Wallet{Holder: walletFrom.Holder, Value:  walletFrom.Value - value}
+	x := Wallet{Holder: walletFrom.Holder, Value:  walletFrom.Value - value, Status: "Active"}
 	xx, _ := json.Marshal(x)
 	err := APIstub.PutState(walletFrom.Holder, xx)
 	if err != nil {
@@ -542,7 +542,7 @@ func doPayment(APIstub shim.ChaincodeStubInterface, from string, to string, valu
 	}
 	
 
-	y, _ := json.Marshal(Wallet{Holder: walletTo.Holder, Value:  walletTo.Value + value})
+	y, _ := json.Marshal(Wallet{Holder: walletTo.Holder, Value:  walletTo.Value + value, Status: "Active"})
 	err = APIstub.PutState(walletTo.Holder, y)
 	if err != nil {
 		return fmt.Sprintf("Failed to transfer value from %s TO %s", from, to)
